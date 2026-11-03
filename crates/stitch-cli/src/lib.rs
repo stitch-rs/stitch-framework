@@ -427,26 +427,27 @@ pub fn run_fix(target_dir: &Path, args: FixArgs<'_>) -> Result<(), Box<dyn std::
     let run_taxo = args.all || cat_set.contains("taxo");
 
     if run_scrooge {
-        println!("    Active category: `scrooge` (struct alignment optimization)");
+        println!("    Active category: `scrooge` (struct alignment optimization & stringly-typed macro remediation)");
         let engine = FixEngine::new_scoped(target_dir, scope_filter.clone());
         let report = engine.run_scrooge(args.dry_run)?;
+        let stringly_fixed = engine.run_stringly_typed(args.dry_run)?;
 
-        if report.changes.is_empty() {
+        if report.changes.is_empty() && stringly_fixed == 0 {
             println!(
-                "\n✅ All audited structs already adhere to optimal descending alignment. 0 bytes wasted."
+                "\n✅ All audited structs and macro attributes adhere to optimal Scrooge / SMA standards."
             );
         } else {
             let action = if args.dry_run { "PROPOSED" } else { "APPLIED" };
             println!("\n{:=<80}", "");
-            println!("           AUTOMATED STRUCT ALIGNMENT (SCROOGE) REORDERING REPORT");
+            println!("           AUTOMATED SCROOGE / SMA ARCHITECTURAL FIX REPORT");
             println!("{:=<80}", "");
             println!(
-                "  Status: {} fixes across {} structs",
+                "  Status: {} struct fixes, {} stringly-typed macro fixes",
                 action,
-                report.changes.len()
+                stringly_fixed
             );
             println!(
-                "  Total Padding Eliminated: {} bytes\n",
+                "  Total Struct Padding Eliminated: {} bytes\n",
                 report.total_padding_saved
             );
 
@@ -460,6 +461,12 @@ pub fn run_fix(target_dir: &Path, args: FixArgs<'_>) -> Result<(), Box<dyn std::
                 println!(
                     "    Declared Size: {} B -> {} B  |  Padding Eliminated: {} B",
                     ch.declared_size_before, ch.declared_size_after, ch.padding_saved
+                );
+            }
+            if stringly_fixed > 0 {
+                println!(
+                    "  • [MACROS] Replaced {} stringly-typed attribute literals with type-safe Enums / Flags",
+                    stringly_fixed
                 );
             }
             println!("{:=<80}\n", "");

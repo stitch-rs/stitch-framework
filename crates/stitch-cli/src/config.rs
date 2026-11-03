@@ -230,6 +230,8 @@ impl Default for StitchConfig {
         rules.insert("SCROOGE-CACHE-ALIGN".to_string(), RuleSeverity::Deny);
         rules.insert("SCROOGE-TOKEN-SIZE".to_string(), RuleSeverity::Deny);
         rules.insert("SCROOGE-PADDING-HOLE".to_string(), RuleSeverity::Warn);
+        rules.insert("SCROOGE-STRINGLY-TYPED".to_string(), RuleSeverity::Deny);
+        rules.insert("SMA-SCROOGE-016".to_string(), RuleSeverity::Deny);
 
         rules.insert("HOTPATH-ALLOC-MACRO".to_string(), RuleSeverity::Deny);
         rules.insert("HOTPATH-ALLOC-METHOD".to_string(), RuleSeverity::Deny);
@@ -416,6 +418,7 @@ pub fn canonical_rule_key(key: &str) -> &'static str {
         "SMA-SCROOGE-013" | "SCROOGE-TOKEN-SIZE" => "SMA-SCROOGE-013",
         "SMA-SCROOGE-014" | "SCROOGE-PADDING-HOLE" => "SMA-SCROOGE-014",
         "SMA-SCROOGE-015" | "SCROOGE-CACHE-CROSS" => "SMA-SCROOGE-015",
+        "SMA-SCROOGE-016" | "SCROOGE-STRINGLY-TYPED" => "SMA-SCROOGE-016",
         "SMA-HOTPATH-020" | "HOTPATH-ALLOC-MACRO" => "SMA-HOTPATH-020",
         "SMA-HOTPATH-021" | "HOTPATH-ALLOC-METHOD" => "SMA-HOTPATH-021",
         "SMA-HOTPATH-022" | "HOTPATH-ALLOC-CTOR" => "SMA-HOTPATH-022",

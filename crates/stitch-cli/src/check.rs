@@ -5,7 +5,7 @@ use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
-use syn::{Attribute, Fields, File, ItemImpl, ItemStruct, ItemTrait, Receiver};
+use syn::{Attribute, Expr, ExprLit, Fields, File, ItemImpl, ItemStruct, ItemTrait, Lit, Receiver};
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone)]
@@ -668,9 +668,74 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
         }
         syn::visit::visit_expr_call(self, i);
     }
+
+    fn visit_attribute(&mut self, attr: &'ast Attribute) {
+        self.check_stringly_typed_attribute(attr);
+        syn::visit::visit_attribute(self, attr);
+    }
 }
 
 impl<'a> AstScanner<'a> {
+    fn check_stringly_typed_attribute(&mut self, attr: &Attribute) {
+        if let syn::Meta::List(meta_list) = &attr.meta {
+            let mut found_nv_spans = std::collections::HashSet::new();
+            let _ = meta_list.parse_nested_meta(|meta| {
+                if let Some(ident) = meta.path.get_ident() {
+                    let key = ident.to_string();
+                    let is_variant_key = matches!(
+                        key.as_str(),
+                        "codec" | "column" | "profile" | "strategy" | "algorithm" | "algo" | "compressor" | "hasher" | "mode"
+                    );
+                    if is_variant_key
+                        && let Ok(value) = meta.value()
+                        && let Ok(Expr::Lit(ExprLit { lit: Lit::Str(s), .. })) = value.parse::<Expr>()
+                    {
+                        let val = s.value();
+                        found_nv_spans.insert(val.clone());
+                        self.record(
+                            "SMA-SCROOGE-016",
+                            s.span(),
+                            format!(
+                                "Stringly-typed macro attribute: string literal `\"{val}\"` is forbidden for `{key}` under Scrooge / SMA standards."
+                            ),
+                            Some(format!(
+                                "Replace `\"{val}\"` with type-safe Enum variant or path (e.g. `{key} = {val}` or shorthand flag)."
+                            )),
+                        );
+                    }
+                }
+                Ok(())
+            });
+
+            // Detect bare string literals like #[stitch("varint")] if not part of key = "val"
+            if found_nv_spans.is_empty() {
+                for tt in meta_list.tokens.clone() {
+                    if let proc_macro2::TokenTree::Literal(lit) = tt {
+                        let s = lit.to_string();
+                        if s.starts_with('"') && s.ends_with('"') {
+                            let unquoted = s.trim_matches('"');
+                            if matches!(
+                                unquoted,
+                                "varint" | "zigzag" | "raw" | "dict" | "rle" | "gorilla" | "adaptive" | "direct" | "balanced"
+                            ) {
+                                self.record(
+                                    "SMA-SCROOGE-016",
+                                    lit.span(),
+                                    format!(
+                                        "Stringly-typed macro attribute: bare string literal `{s}` is forbidden inside attributes under Scrooge / SMA standards."
+                                    ),
+                                    Some(format!(
+                                        "Replace `{s}` with type-safe identifier flag (e.g. `#[stitch({unquoted})]`)."
+                                    )),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn record(&mut self, code: &str, span: proc_macro2::Span, msg: String, help: Option<String>) {
         let severity = self.config.severity_for_path(self.file_path, code);
         if severity == RuleSeverity::Allow {
@@ -1008,5 +1073,45 @@ mod tests {
                 .any(|d| d.code == "SMA-HOTPATH-022"),
             "Expected SMA-HOTPATH-022 for Box::new"
         );
+    }
+
+    #[test]
+    fn test_stringly_typed_macro_attribute_detected() {
+        let code = r#"
+            #[stitch(codec = "varint", column = "dict")]
+            pub struct Frame {
+                pub id: u64,
+            }
+
+            #[stitch(codec = Varint, column = ColumnCodec::Dict)]
+            pub struct GoodFrame {
+                pub id: u64,
+            }
+        "#;
+        let syntax_tree = syn::parse_file(code).unwrap();
+        let cfg = StitchConfig::default();
+        let mut visitor = AstScanner {
+            config: &cfg,
+            file_path: Path::new("test_stringly.rs"),
+            diagnostics: Vec::new(),
+            in_hot_path_fn: false,
+            in_pipeline_impl: false,
+            in_test: false,
+        };
+        visitor.visit_file(&syntax_tree);
+
+        let stringly_diags: Vec<_> = visitor
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == "SMA-SCROOGE-016")
+            .collect();
+
+        assert_eq!(
+            stringly_diags.len(),
+            2,
+            "Expected exactly 2 stringly-typed attribute violations in Frame"
+        );
+        assert!(stringly_diags[0].message.contains("\"varint\""));
+        assert!(stringly_diags[1].message.contains("\"dict\""));
     }
 }

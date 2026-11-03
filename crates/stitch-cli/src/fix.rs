@@ -188,6 +188,75 @@ impl<'a> FixEngine<'a> {
 
         Ok(report)
     }
+
+    /// Automatically replaces stringly-typed macro attributes with type-safe identifiers and enum variants.
+    /// E.g. `codec = "varint"` -> `codec = Varint`, `column = "dict"` -> `column = ColumnCodec::Dict`.
+    pub fn run_stringly_typed(&self, dry_run: bool) -> Result<usize, String> {
+        let rust_files = collect_rust_files(self.root_dir, self.scope.as_ref());
+        let mut total_fixed = 0;
+
+        for path in rust_files {
+            if path.components().any(|c| c.as_os_str() == "target") {
+                continue;
+            }
+            let content = match std::fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let mut modified = content.clone();
+            let mut file_fixes = 0;
+
+            // Common codec / column / profile replacements in attributes
+            let replacements = [
+                // stitch attribute named values
+                (r#"codec = "varint""#, "codec = Varint"),
+                (r#"codec = "zigzag""#, "codec = ZigZag"),
+                (r#"codec = "raw""#, "codec = Raw"),
+                (r#"column = "dict""#, "column = ColumnCodec::Dict"),
+                (r#"column = "rle""#, "column = ColumnCodec::Rle"),
+                (r#"column = "gorilla""#, "column = ColumnCodec::Gorilla"),
+                (r#"column = "adaptive""#, "column = ColumnCodec::Adaptive"),
+                (r#"profile = "direct""#, "profile = Profile::Direct"),
+                (r#"profile = "balanced""#, "profile = Profile::Balanced"),
+                // Shorthand bare forms in attributes
+                (r#"("varint")"#, "(Varint)"),
+                (r#"("zigzag")"#, "(ZigZag)"),
+                (r#"("raw")"#, "(Raw)"),
+                (r#"("dict")"#, "(Dict)"),
+                (r#"("rle")"#, "(Rle)"),
+                (r#"("gorilla")"#, "(Gorilla)"),
+                (r#"("adaptive")"#, "(Adaptive)"),
+            ];
+
+            for (target, replacement) in replacements {
+                if modified.contains(target) {
+                    let count = modified.matches(target).count();
+                    modified = modified.replace(target, replacement);
+                    file_fixes += count;
+                }
+            }
+
+            if file_fixes > 0 {
+                if !dry_run {
+                    // Verify AST before touching disk
+                    if syn::parse_file(&modified).is_err() {
+                        eprintln!(
+                            "Safety abort: Stringly-typed fix for `{}` resulted in invalid AST. Skipping.",
+                            path.display()
+                        );
+                        continue;
+                    }
+                    if let Err(e) = std::fs::write(&path, &modified) {
+                        return Err(format!("Failed to write to `{}`: {e}", path.display()));
+                    }
+                }
+                total_fixed += file_fixes;
+            }
+        }
+
+        Ok(total_fixed)
+    }
 }
 
 struct StructCandidate {
