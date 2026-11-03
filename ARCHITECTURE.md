@@ -42,6 +42,14 @@ The pipeline topology is **statically closed**:
 
 Conversely, behavior is **open**: layers and terminals are freely composable across generic contexts, intents, outcomes, and error domains.
 
+### Type-Safe Macro Standard (Anti-Stringly-Typed Invariant)
+
+Procedural macros in the SMA ecosystem (`#[pipeline(...)]`, `#[wire_pipeline(...)]`, `#[layer]`, `#[terminal]`, `#[derive(Record)]`) strictly mandate:
+
+- **No String Literals**: Behavior, layers, terminals, codecs, and optimization profiles must never be configured using string literals (e.g. `"varint"`, `"balanced"`).
+- **First-Class Rust Symbols**: All variants and targets must be typed paths, enum variants, or valid Rust type identifiers (`codec = FieldCodec::Varint`, `terminal = MyTerminal`).
+- **Newtype Expansion**: Pipeline macros must expand into `#[repr(transparent)]` Tuple Structs (`Newtype Pattern`) rather than untyped DSL blocks.
+
 ---
 
 ## 3. Panic & Resilience Policy (Contract Invariant M7)
