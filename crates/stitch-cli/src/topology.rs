@@ -202,12 +202,14 @@ impl<'a> TopologyScanner<'a> {
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
 
-            // Ignore target, git, hidden, and build artifact folders
+            // Ignore target, git, hidden, auxiliary testing/bench folders
             if name.starts_with('.')
                 || name == "target"
                 || name == "node_modules"
                 || name == "book"
                 || name == "fuzz"
+                || name == "benches"
+                || name == "benches-ecosystem"
             {
                 continue;
             }

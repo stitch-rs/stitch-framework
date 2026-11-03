@@ -2,10 +2,12 @@
 
 pub mod check;
 pub mod config;
+pub mod decompose;
 pub mod fix;
 pub mod graph;
 pub mod health;
 pub mod metrics;
+pub mod scaffold;
 pub mod topology;
 
 use check::CheckRunner;
@@ -141,6 +143,56 @@ pub enum Commands {
         #[arg(short, long)]
         scope: Option<String>,
     },
+    /// Scaffolds a new SMA project repository with canonical topology (facade, uniform, segmented)
+    New {
+        /// Project directory name to create
+        name: String,
+        /// Topology template (facade, uniform, segmented)
+        #[arg(short, long, default_value = "uniform")]
+        template: String,
+        /// Target parent directory (default: current directory)
+        #[arg(short, long, default_value = ".")]
+        dir: PathBuf,
+        /// Organization namespace prefix (e.g. `goldsrc`, `stitch`)
+        #[arg(long)]
+        org: Option<String>,
+    },
+    /// Adds an SMA component or layer to an existing project according to the Component Hierarchy standard
+    Add {
+        #[command(subcommand)]
+        item: AddCommands,
+    },
+    /// Automatically splits oversized source files by cleanly extracting inline tests
+    Split {
+        /// Target source file to decompose (e.g. `engine/src/chat.rs`)
+        file: PathBuf,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum AddCommands {
+    /// Scaffolds an SMA component (mod.rs, context.rs, pipeline.rs, terminal.rs, tests.rs)
+    Component {
+        /// Component name (e.g. `chat`, `moderation`, `auth`)
+        name: String,
+        /// Functional domain directory (e.g. `services`, `engine`, `hosts`)
+        #[arg(short, long)]
+        domain: Option<String>,
+        /// Target project root directory (default: current directory)
+        #[arg(short, long, default_value = ".")]
+        dir: PathBuf,
+        /// Organization prefix
+        #[arg(long)]
+        org: Option<String>,
+    },
+    /// Scaffolds a new zero-allocation SMA Layer (on_enter/on_exit) within a component
+    Layer {
+        /// Layer struct name (e.g. `RateLimit`, `AuthFilter`)
+        name: String,
+        /// Component directory path containing `src/`
+        #[arg(short, long)]
+        in_component: PathBuf,
+    },
 }
 
 /// Main entry point for CLI binaries.
@@ -215,7 +267,69 @@ pub fn execute(command: Commands) -> Result<(), Box<dyn std::error::Error>> {
             output,
         } => run_graph(&dir, scope.as_deref(), &format, output),
         Commands::Metrics { dir, scope } => run_metrics(&dir, scope.as_deref()),
+        Commands::New {
+            name,
+            template,
+            dir,
+            org,
+        } => run_new(&name, &template, &dir, org.as_deref()),
+        Commands::Add { item } => run_add(item),
+        Commands::Split { file } => run_split(&file),
     }
+}
+
+pub fn run_new(
+    name: &str,
+    template_str: &str,
+    parent_dir: &Path,
+    org: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let template = template_str.parse::<scaffold::ProjectTemplate>()?;
+    let path = scaffold::ScaffoldEngine::create_project(parent_dir, name, template, org)?;
+    println!(
+        "✅ Successfully created new SMA project `{name}` ({template_str}) at `{}`",
+        path.display()
+    );
+    Ok(())
+}
+
+pub fn run_add(item: AddCommands) -> Result<(), Box<dyn std::error::Error>> {
+    match item {
+        AddCommands::Component {
+            name,
+            domain,
+            dir,
+            org,
+        } => {
+            let path = scaffold::ScaffoldEngine::add_component(
+                &dir,
+                &name,
+                domain.as_deref(),
+                org.as_deref(),
+            )?;
+            println!(
+                "✅ Scaffolding complete: Created SMA component `{name}` at `{}`",
+                path.display()
+            );
+        }
+        AddCommands::Layer { name, in_component } => {
+            let path = scaffold::ScaffoldEngine::add_layer(&in_component, &name)?;
+            println!(
+                "✅ Created zero-allocation SMA layer `{name}` at `{}`",
+                path.display()
+            );
+        }
+    }
+    Ok(())
+}
+
+pub fn run_split(file: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    println!("==> Decomposing source file `{}`...", file.display());
+    let (mod_path, tests_path) = decompose::DecomposeEngine::split_tests(file)?;
+    println!("✅ Decomposition successful:");
+    println!("   • Main module: {}", mod_path.display());
+    println!("   • Extracted tests: {}", tests_path.display());
+    Ok(())
 }
 
 #[derive(Debug, Clone, Default)]

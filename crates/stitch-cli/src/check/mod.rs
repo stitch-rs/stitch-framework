@@ -1,5 +1,4 @@
-//! Architecture AST & Topology scanner implementing `stitch check`.
-
+#![doc = " Architecture AST & Topology scanner implementing `stitch check`."]
 use crate::config::{RuleSeverity, ScopeFilter, StitchConfig};
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
@@ -7,7 +6,6 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{Attribute, Expr, ExprLit, Fields, File, ItemImpl, ItemStruct, ItemTrait, Lit, Receiver};
 use walkdir::WalkDir;
-
 #[derive(Debug, Clone)]
 pub struct Diagnostic {
     pub code: String,
@@ -18,7 +16,6 @@ pub struct Diagnostic {
     pub line: usize,
     pub column: usize,
 }
-
 impl Diagnostic {
     pub fn render_rustc(&self) -> String {
         let level = match self.severity {
@@ -26,7 +23,6 @@ impl Diagnostic {
             RuleSeverity::Warn => "warning",
             RuleSeverity::Allow => return String::new(),
         };
-
         let file_display = self.file.display();
         let mut out = format!(
             "{level}[{}]: {}\n  --> {}:{}:{}\n",
@@ -37,17 +33,14 @@ impl Diagnostic {
         }
         out
     }
-
     pub fn render_miette(&self) -> String {
         let content = std::fs::read_to_string(&self.file).unwrap_or_default();
         let (offset, len) = find_span_offset_len(&content, self.line, self.column);
-
         let sev = match self.severity {
             RuleSeverity::Deny => miette::Severity::Error,
             RuleSeverity::Warn => miette::Severity::Warning,
             RuleSeverity::Allow => return String::new(),
         };
-
         let diag = SmaMietteDiagnostic {
             message: self.message.clone(),
             code: self.code.clone(),
@@ -61,7 +54,6 @@ impl Diagnostic {
             span: (offset, len).into(),
             label: self.message.clone(),
         };
-
         let mut out = String::new();
         let handler = miette::GraphicalReportHandler::new();
         if handler.render_report(&mut out, &diag).is_ok() {
@@ -71,8 +63,7 @@ impl Diagnostic {
         }
     }
 }
-
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror :: Error, Debug)]
 #[error("{message}")]
 pub struct SmaMietteDiagnostic {
     pub message: String,
@@ -84,43 +75,35 @@ pub struct SmaMietteDiagnostic {
     pub span: miette::SourceSpan,
     pub label: String,
 }
-
 impl miette::Diagnostic for SmaMietteDiagnostic {
     fn code<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
         Some(Box::new(&self.code))
     }
-
     fn severity(&self) -> Option<miette::Severity> {
         Some(self.severity)
     }
-
     fn help<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
         self.help_text
             .as_ref()
             .map(|h| Box::new(h) as Box<dyn std::fmt::Display>)
     }
-
     fn url<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
         self.url
             .as_ref()
             .map(|u| Box::new(u) as Box<dyn std::fmt::Display>)
     }
-
     fn source_code(&self) -> Option<&dyn miette::SourceCode> {
         Some(&self.src)
     }
-
     fn labels(&self) -> Option<Box<dyn Iterator<Item = miette::LabeledSpan> + '_>> {
         let span = miette::LabeledSpan::new_with_span(Some(self.label.clone()), self.span);
         Some(Box::new(std::iter::once(span)))
     }
 }
-
 fn find_span_offset_len(content: &str, line: usize, col: usize) -> (usize, usize) {
     let mut current_line = 1;
     let mut current_col = 0;
     let mut target_offset = 0;
-
     for (idx, ch) in content.char_indices() {
         if current_line == line && current_col >= col.saturating_sub(1) {
             target_offset = idx;
@@ -133,24 +116,20 @@ fn find_span_offset_len(content: &str, line: usize, col: usize) -> (usize, usize
             current_col += 1;
         }
     }
-
     let rest = &content[target_offset..];
     let token_len = rest
         .chars()
         .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '!')
         .map(|c| c.len_utf8())
         .sum::<usize>();
-
     let len = if token_len > 0 { token_len } else { 1 };
     (target_offset, len)
 }
-
 pub struct CheckRunner<'a> {
     config: &'a StitchConfig,
     root_dir: &'a Path,
     scope: Option<ScopeFilter>,
 }
-
 impl<'a> CheckRunner<'a> {
     pub fn new(config: &'a StitchConfig, root_dir: &'a Path) -> Self {
         Self {
@@ -159,7 +138,6 @@ impl<'a> CheckRunner<'a> {
             scope: None,
         }
     }
-
     pub fn new_scoped(
         config: &'a StitchConfig,
         root_dir: &'a Path,
@@ -171,30 +149,21 @@ impl<'a> CheckRunner<'a> {
             scope,
         }
     }
-
     pub fn run(&self) -> Vec<Diagnostic> {
         let rust_files = self.collect_rust_files();
-
         let mut diagnostics: Vec<Diagnostic> = rust_files
             .par_iter()
             .flat_map(|path| self.scan_file(path))
             .collect();
-
-        // Cross-file boundary checks
         diagnostics.extend(self.check_boundaries());
-
-        // Structural Workspace Topology checks
         let topo_scanner = crate::topology::TopologyScanner::new(self.config, self.root_dir);
         let topo_report = topo_scanner.evaluate();
         diagnostics.extend(topo_report.diagnostics);
-
         diagnostics
     }
-
     fn collect_rust_files(&self) -> Vec<PathBuf> {
         crate::config::collect_rust_files(self.root_dir, self.scope.as_ref()).collect()
     }
-
     fn scan_file(&self, path: &Path) -> Vec<Diagnostic> {
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
@@ -210,7 +179,6 @@ impl<'a> CheckRunner<'a> {
                 }];
             }
         };
-
         let syntax_tree: File = match syn::parse_file(&content) {
             Ok(tree) => tree,
             Err(e) => {
@@ -228,7 +196,6 @@ impl<'a> CheckRunner<'a> {
                 }];
             }
         };
-
         let mut visitor = AstScanner {
             config: self.config,
             file_path: path,
@@ -237,11 +204,9 @@ impl<'a> CheckRunner<'a> {
             in_pipeline_impl: false,
             in_test: false,
         };
-
         visitor.visit_file(&syntax_tree);
         visitor.diagnostics
     }
-
     fn check_boundaries(&self) -> Vec<Diagnostic> {
         let mut diags = Vec::new();
         let cargo_tomls = WalkDir::new(self.root_dir)
@@ -249,7 +214,6 @@ impl<'a> CheckRunner<'a> {
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| e.file_name() == "Cargo.toml");
-
         for entry in cargo_tomls {
             let manifest_path = entry.path();
             let content = match std::fs::read_to_string(manifest_path) {
@@ -270,7 +234,6 @@ impl<'a> CheckRunner<'a> {
                     continue;
                 }
             };
-
             let toml: toml::Value = match toml::from_str(&content) {
                 Ok(v) => v,
                 Err(e) => {
@@ -289,7 +252,6 @@ impl<'a> CheckRunner<'a> {
                     continue;
                 }
             };
-
             let pkg_name = match toml
                 .get("package")
                 .and_then(|p| p.get("name"))
@@ -298,7 +260,6 @@ impl<'a> CheckRunner<'a> {
                 Some(n) => n,
                 None => continue,
             };
-
             if let Some(scope) = &self.scope
                 && !scope.is_empty()
                 && !scope.matches_name(pkg_name)
@@ -306,9 +267,7 @@ impl<'a> CheckRunner<'a> {
             {
                 continue;
             }
-
             let deps = toml.get("dependencies").and_then(|d| d.as_table());
-
             for forbidden in &self.config.boundaries.forbidden_dependencies {
                 let from_crates = match forbidden.from.as_str() {
                     "core_crates" => &self.config.boundaries.core_crates,
@@ -316,36 +275,24 @@ impl<'a> CheckRunner<'a> {
                     "service_crates" => &self.config.boundaries.service_crates,
                     _ => continue,
                 };
-
                 let to_crates = match forbidden.to.as_str() {
                     "adapter_crates" => &self.config.boundaries.adapter_crates,
                     _ => continue,
                 };
-
                 if from_crates.iter().any(|c| c == pkg_name)
                     && let Some(deps_table) = deps
                 {
                     for to_crate in to_crates {
                         if deps_table.contains_key(to_crate) {
-                            diags.push(Diagnostic {
-                                code: "SMA-BOUND-030".to_string(),
-                                severity: RuleSeverity::Deny,
-                                message: format!("Dependency Inversion Violation: Crate `{pkg_name}` directly references adapter crate `{to_crate}` in Cargo.toml."),
-                                help: Some("Core and Port crates must remain purely abstract without vendor FFI adapter dependencies.".to_string()),
-                                file: manifest_path.to_path_buf(),
-                                line: 1,
-                                column: 1,
-                            });
+                            diags . push (Diagnostic { code : "SMA-BOUND-030" . to_string () , severity : RuleSeverity :: Deny , message : format ! ("Dependency Inversion Violation: Crate `{pkg_name}` directly references adapter crate `{to_crate}` in Cargo.toml.") , help : Some ("Core and Port crates must remain purely abstract without vendor FFI adapter dependencies." . to_string ()) , file : manifest_path . to_path_buf () , line : 1 , column : 1 , }) ;
                         }
                     }
                 }
             }
         }
-
         diags
     }
 }
-
 struct AstScanner<'a> {
     config: &'a StitchConfig,
     file_path: &'a Path,
@@ -354,7 +301,6 @@ struct AstScanner<'a> {
     in_pipeline_impl: bool,
     in_test: bool,
 }
-
 impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
     fn visit_item_mod(&mut self, i: &'ast syn::ItemMod) {
         let is_cfg_test = i.ident == "tests" || has_cfg_test(&i.attrs);
@@ -365,7 +311,6 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
         syn::visit::visit_item_mod(self, i);
         self.in_test = was_test;
     }
-
     fn visit_item_fn(&mut self, i: &'ast syn::ItemFn) {
         let is_test_fn = has_attr(&i.attrs, "test") || has_cfg_test(&i.attrs);
         let was_test = self.in_test;
@@ -375,45 +320,36 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
         syn::visit::visit_item_fn(self, i);
         self.in_test = was_test;
     }
-
     fn visit_item_struct(&mut self, i: &'ast ItemStruct) {
         let ident_str = i.ident.to_string();
         let span = i.ident.span();
-
-        // 1. Blackboard Check
         if has_attr(&i.attrs, "blackboard")
             || ident_str.ends_with("Blackboard")
             || ident_str.ends_with("Context")
         {
             if !ident_str.ends_with("Context") && !ident_str.ends_with("Blackboard") {
-                self.record("SMA-TAXO-008", span, format!("Type `{ident_str}` decorated with #[stitch::blackboard] must end with `Context` or `Blackboard`."), None);
+                self . record ("SMA-TAXO-008" , span , format ! ("Type `{ident_str}` decorated with #[stitch::blackboard] must end with `Context` or `Blackboard`.") , None) ;
             }
             if !has_cache_align(&i.attrs) {
-                self.record("SMA-SCROOGE-012", span, format!("Context Blackboard `{ident_str}` missing mandatory `#[repr(C, align(64))]` cache-line attribute."), Some("Add `#[repr(C, align(64))]` to align with L1D cache line.".to_string()));
+                self . record ("SMA-SCROOGE-012" , span , format ! ("Context Blackboard `{ident_str}` missing mandatory `#[repr(C, align(64))]` cache-line attribute.") , Some ("Add `#[repr(C, align(64))]` to align with L1D cache line." . to_string ())) ;
             }
             self.check_heap_fields(&i.fields, &ident_str);
         }
-
-        // 2. Token Check
         if has_attr(&i.attrs, "token") || ident_str.ends_with("Token") {
             if !ident_str.ends_with("Token") {
-                self.record("SMA-TAXO-006", span, format!("Type `{ident_str}` decorated with #[stitch::token] must have suffix `Token`."), None);
+                self . record ("SMA-TAXO-006" , span , format ! ("Type `{ident_str}` decorated with #[stitch::token] must have suffix `Token`.") , None) ;
             }
             if !has_repr_transparent(&i.attrs) {
-                self.record("SMA-SCROOGE-013", span, format!("Token `{ident_str}` must have `#[repr(transparent)]` to guarantee 8-byte register layout."), None);
+                self . record ("SMA-SCROOGE-013" , span , format ! ("Token `{ident_str}` must have `#[repr(transparent)]` to guarantee 8-byte register layout.") , None) ;
             }
         }
-
-        // 3. Id Check
         if (has_attr(&i.attrs, "id")
             || (ident_str.ends_with("Id") && !ident_str.starts_with("TypeId")))
             && !has_repr_transparent(&i.attrs)
             && has_attr(&i.attrs, "id")
         {
-            self.record("SMA-SCROOGE-013", span, format!("Id `{ident_str}` must have `#[repr(transparent)]` to guarantee register-passing layout."), None);
+            self . record ("SMA-SCROOGE-013" , span , format ! ("Id `{ident_str}` must have `#[repr(transparent)]` to guarantee register-passing layout.") , None) ;
         }
-
-        // 4. Layer Check
         if has_attr(&i.attrs, "layer") {
             if !ident_str.ends_with("Layer") {
                 self.record(
@@ -425,8 +361,6 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
             }
             self.check_heap_fields(&i.fields, &ident_str);
         }
-
-        // 5. Terminal Check
         if has_attr(&i.attrs, "terminal") {
             if !ident_str.ends_with("Terminal") {
                 self.record(
@@ -438,8 +372,6 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
             }
             self.check_heap_fields(&i.fields, &ident_str);
         }
-
-        // 6. Adapter Check
         if has_attr(&i.attrs, "adapter") && !ident_str.ends_with("Adapter") {
             self.record(
                 "SMA-TAXO-004",
@@ -448,8 +380,6 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
                 None,
             );
         }
-
-        // 7. Provider Check
         if has_attr(&i.attrs, "provider") && !ident_str.ends_with("Provider") {
             self.record(
                 "SMA-TAXO-005",
@@ -458,10 +388,8 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
                 None,
             );
         }
-
         syn::visit::visit_item_struct(self, i);
     }
-
     fn visit_item_trait(&mut self, i: &'ast ItemTrait) {
         let ident_str = i.ident.to_string();
         if has_attr(&i.attrs, "port") && !ident_str.ends_with("Port") {
@@ -474,7 +402,6 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
         }
         syn::visit::visit_item_trait(self, i);
     }
-
     fn visit_item_impl(&mut self, i: &'ast ItemImpl) {
         let is_pipeline = has_attr(&i.attrs, "layer")
             || has_attr(&i.attrs, "terminal")
@@ -483,59 +410,34 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
             || is_impl_of(i, "PipelineChain")
             || is_impl_of(i, "ChatLayer")
             || is_impl_of(i, "TakeDamageLayer");
-
         if has_attr(&i.attrs, "layer") || is_impl_of(i, "Layer") {
             for item in &i.items {
                 if let syn::ImplItem::Fn(m) = item {
                     let fn_name = m.sig.ident.to_string();
                     if (fn_name == "on_enter" || fn_name == "on_exit") && is_receiver_mut(&m.sig) {
-                        self.record(
-                            "SMA-CONCUR-040",
-                            m.sig.span(),
-                            format!("Layer method `{fn_name}` has mutable receiver `&mut self`. Must be immutable `&self`."),
-                            Some("Use immutable `&self` to guarantee thread-safe re-entrancy during U-cycle traversal.".to_string()),
-                        );
+                        self . record ("SMA-CONCUR-040" , m . sig . span () , format ! ("Layer method `{fn_name}` has mutable receiver `&mut self`. Must be immutable `&self`.") , Some ("Use immutable `&self` to guarantee thread-safe re-entrancy during U-cycle traversal." . to_string ()) ,) ;
                     }
                 }
             }
         }
-
-        // CQS Checks: Query & Command
         let is_query_impl = has_attr(&i.attrs, "query") || is_impl_of(i, "Query");
         let is_command_impl = has_attr(&i.attrs, "command") || is_impl_of(i, "Command");
-
         if is_query_impl && is_command_impl {
-            self.record(
-                "SMA-CQS-051",
-                i.self_ty.span(),
-                "CQS Hybrid Violation: A type cannot implement both `Query` and `Command`. Keep intent read/write roles strictly segregated.".to_string(),
-                Some("Segregate read queries and mutating commands into separate distinct types.".to_string()),
-            );
+            self . record ("SMA-CQS-051" , i . self_ty . span () , "CQS Hybrid Violation: A type cannot implement both `Query` and `Command`. Keep intent read/write roles strictly segregated." . to_string () , Some ("Segregate read queries and mutating commands into separate distinct types." . to_string ()) ,) ;
         }
-
         if is_query_impl {
             for item in &i.items {
                 if let syn::ImplItem::Fn(m) = item {
                     let fn_name = m.sig.ident.to_string();
                     if fn_name == "query" {
                         if is_receiver_mut(&m.sig) {
-                            self.record(
-                                "SMA-CQS-050",
-                                m.sig.span(),
-                                "Query method `query` has mutable receiver `&mut self`. Queries must be pure reads on `&self`.".to_string(),
-                                Some("Change receiver to `&self`.".to_string()),
-                            );
+                            self . record ("SMA-CQS-050" , m . sig . span () , "Query method `query` has mutable receiver `&mut self`. Queries must be pure reads on `&self`." . to_string () , Some ("Change receiver to `&self`." . to_string ()) ,) ;
                         }
                         for input in &m.sig.inputs {
                             if let syn::FnArg::Typed(pat_type) = input {
-                                let ty_str = quote::quote!(#pat_type).to_string();
+                                let ty_str = quote :: quote ! (# pat_type).to_string();
                                 if ty_str.contains("& mut") {
-                                    self.record(
-                                        "SMA-CQS-050",
-                                        pat_type.span(),
-                                        "Query method cannot receive mutable reference `&mut`. CQS strictly forbids mutation in queries.".to_string(),
-                                        Some("Pass immutable reference `&TCtx`.".to_string()),
-                                    );
+                                    self . record ("SMA-CQS-050" , pat_type . span () , "Query method cannot receive mutable reference `&mut`. CQS strictly forbids mutation in queries." . to_string () , Some ("Pass immutable reference `&TCtx`." . to_string ()) ,) ;
                                 }
                             }
                         }
@@ -543,13 +445,11 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
                 }
             }
         }
-
         let was_pipeline = self.in_pipeline_impl;
         self.in_pipeline_impl = is_pipeline;
         syn::visit::visit_item_impl(self, i);
         self.in_pipeline_impl = was_pipeline;
     }
-
     fn visit_impl_item_fn(&mut self, i: &'ast syn::ImplItemFn) {
         let fn_name = i.sig.ident.to_string();
         let was_hot = self.in_hot_path_fn;
@@ -562,7 +462,6 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
         syn::visit::visit_impl_item_fn(self, i);
         self.in_hot_path_fn = was_hot;
     }
-
     fn visit_macro(&mut self, i: &'ast syn::Macro) {
         let macro_name = i
             .path
@@ -601,7 +500,6 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
         }
         syn::visit::visit_macro(self, i);
     }
-
     fn visit_expr_method_call(&mut self, i: &'ast syn::ExprMethodCall) {
         let is_hotpath =
             !self.in_test && (self.in_hot_path_fn || self.config.is_strict_hotpath(self.file_path));
@@ -611,12 +509,7 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
                 method_name.as_str(),
                 "to_string" | "to_owned" | "clone_into"
             ) {
-                self.record(
-                    "SMA-HOTPATH-021",
-                    i.method.span(),
-                    format!("Method call `.{method_name}()` incurs dynamic heap allocation in hot path."),
-                    Some("Avoid heap allocations on hot paths; pass borrowed slices or fixed-capacity buffers.".to_string()),
-                );
+                self . record ("SMA-HOTPATH-021" , i . method . span () , format ! ("Method call `.{method_name}()` incurs dynamic heap allocation in hot path.") , Some ("Avoid heap allocations on hot paths; pass borrowed slices or fixed-capacity buffers." . to_string ()) ,) ;
             } else if matches!(method_name.as_str(), "unwrap" | "expect") {
                 self.record(
                     "SMA-HOTPATH-020",
@@ -631,12 +524,11 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
         }
         syn::visit::visit_expr_method_call(self, i);
     }
-
     fn visit_expr_call(&mut self, i: &'ast syn::ExprCall) {
         let is_hotpath =
             !self.in_test && (self.in_hot_path_fn || self.config.is_strict_hotpath(self.file_path));
         if is_hotpath {
-            let func_str = quote::quote!(#i.func).to_string();
+            let func_str = quote :: quote ! (# i . func).to_string();
             if func_str.contains("Box :: new")
                 || func_str.contains("Arc :: new")
                 || func_str.contains("Rc :: new")
@@ -647,12 +539,7 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
                 || func_str.contains("String :: from")
                 || func_str.contains("String :: new")
             {
-                self.record(
-                    "SMA-HOTPATH-022",
-                    i.func.span(),
-                    format!("Heap constructor `{func_str}` is forbidden in hot path."),
-                    Some("Construct data statically or pre-allocate during initialization outside the U-cycle.".to_string()),
-                );
+                self . record ("SMA-HOTPATH-022" , i . func . span () , format ! ("Heap constructor `{func_str}` is forbidden in hot path.") , Some ("Construct data statically or pre-allocate during initialization outside the U-cycle." . to_string ()) ,) ;
             } else if func_str == "abort"
                 || func_str.ends_with(":: abort")
                 || func_str == "exit"
@@ -673,46 +560,16 @@ impl<'a, 'ast> Visit<'ast> for AstScanner<'a> {
         }
         syn::visit::visit_expr_call(self, i);
     }
-
     fn visit_attribute(&mut self, attr: &'ast Attribute) {
         self.check_stringly_typed_attribute(attr);
         syn::visit::visit_attribute(self, attr);
     }
 }
-
 impl<'a> AstScanner<'a> {
     fn check_stringly_typed_attribute(&mut self, attr: &Attribute) {
         if let syn::Meta::List(meta_list) = &attr.meta {
             let mut found_nv_spans = std::collections::HashSet::new();
-            let _ = meta_list.parse_nested_meta(|meta| {
-                if let Some(ident) = meta.path.get_ident() {
-                    let key = ident.to_string();
-                    let is_variant_key = matches!(
-                        key.as_str(),
-                        "codec" | "column" | "profile" | "strategy" | "algorithm" | "algo" | "compressor" | "hasher" | "mode"
-                    );
-                    if is_variant_key
-                        && let Ok(value) = meta.value()
-                        && let Ok(Expr::Lit(ExprLit { lit: Lit::Str(s), .. })) = value.parse::<Expr>()
-                    {
-                        let val = s.value();
-                        found_nv_spans.insert(val.clone());
-                        self.record(
-                            "SMA-SCROOGE-016",
-                            s.span(),
-                            format!(
-                                "Stringly-typed macro attribute: string literal `\"{val}\"` is forbidden for `{key}` under Scrooge / SMA standards."
-                            ),
-                            Some(format!(
-                                "Replace `\"{val}\"` with type-safe Enum variant or path (e.g. `{key} = {val}` or shorthand flag)."
-                            )),
-                        );
-                    }
-                }
-                Ok(())
-            });
-
-            // Detect bare string literals like #[stitch("varint")] if not part of key = "val"
+            let _ = meta_list . parse_nested_meta (| meta | { if let Some (ident) = meta . path . get_ident () { let key = ident . to_string () ; let is_variant_key = matches ! (key . as_str () , "codec" | "column" | "profile" | "strategy" | "algorithm" | "algo" | "compressor" | "hasher" | "mode") ; if is_variant_key && let Ok (value) = meta . value () && let Ok (Expr :: Lit (ExprLit { lit : Lit :: Str (s) , .. })) = value . parse :: < Expr > () { let val = s . value () ; found_nv_spans . insert (val . clone ()) ; self . record ("SMA-SCROOGE-016" , s . span () , format ! ("Stringly-typed macro attribute: string literal `\"{val}\"` is forbidden for `{key}` under Scrooge / SMA standards.") , Some (format ! ("Replace `\"{val}\"` with type-safe Enum variant or path (e.g. `{key} = {val}` or shorthand flag).")) ,) ; } } Ok (()) }) ;
             if found_nv_spans.is_empty() {
                 for tt in meta_list.tokens.clone() {
                     if let proc_macro2::TokenTree::Literal(lit) = tt {
@@ -731,16 +588,7 @@ impl<'a> AstScanner<'a> {
                                     | "direct"
                                     | "balanced"
                             ) {
-                                self.record(
-                                    "SMA-SCROOGE-016",
-                                    lit.span(),
-                                    format!(
-                                        "Stringly-typed macro attribute: bare string literal `{s}` is forbidden inside attributes under Scrooge / SMA standards."
-                                    ),
-                                    Some(format!(
-                                        "Replace `{s}` with type-safe identifier flag (e.g. `#[stitch({unquoted})]`)."
-                                    )),
-                                );
+                                self . record ("SMA-SCROOGE-016" , lit . span () , format ! ("Stringly-typed macro attribute: bare string literal `{s}` is forbidden inside attributes under Scrooge / SMA standards.") , Some (format ! ("Replace `{s}` with type-safe identifier flag (e.g. `#[stitch({unquoted})]`).")) ,) ;
                             }
                         }
                     }
@@ -748,7 +596,6 @@ impl<'a> AstScanner<'a> {
             }
         }
     }
-
     fn record(&mut self, code: &str, span: proc_macro2::Span, msg: String, help: Option<String>) {
         let severity = self.config.severity_for_path(self.file_path, code);
         if severity == RuleSeverity::Allow {
@@ -765,7 +612,6 @@ impl<'a> AstScanner<'a> {
             column: start.column,
         });
     }
-
     fn check_heap_fields(&mut self, fields: &Fields, struct_name: &str) {
         for field in fields {
             let field_name = field
@@ -775,24 +621,13 @@ impl<'a> AstScanner<'a> {
             self.check_field_type_recursive(&field.ty, struct_name, &field_name);
         }
     }
-
     fn check_field_type_recursive(&mut self, ty: &syn::Type, struct_name: &str, field_name: &str) {
         match ty {
             syn::Type::Path(type_path) => {
                 for seg in &type_path.path.segments {
                     let name = seg.ident.to_string();
                     if self.config.scrooge.forbid_heap_types.contains(&name) {
-                        self.record(
-                            "SMA-SCROOGE-010",
-                            seg.ident.span(),
-                            format!(
-                                "Prohibited heap-allocated type `{name}` in hot-path field `{struct_name}.{field_name}`."
-                            ),
-                            Some(
-                                "Use fixed-capacity array `[u8; N]`, ArrayString, or inline slice."
-                                    .to_string(),
-                            ),
-                        );
+                        self . record ("SMA-SCROOGE-010" , seg . ident . span () , format ! ("Prohibited heap-allocated type `{name}` in hot-path field `{struct_name}.{field_name}`.") , Some ("Use fixed-capacity array `[u8; N]`, ArrayString, or inline slice." . to_string () ,) ,) ;
                     }
                     match &seg.arguments {
                         syn::PathArguments::AngleBracketed(args) => {
@@ -852,29 +687,17 @@ impl<'a> AstScanner<'a> {
                 self.check_field_type_recursive(&g.elem, struct_name, field_name);
             }
             syn::Type::TraitObject(_) | syn::Type::ImplTrait(_) => {
-                self.record(
-                    "SMA-SCROOGE-011",
-                    ty.span(),
-                    format!(
-                        "Trait object or dynamic dispatch detected in hot-path field `{struct_name}.{field_name}`."
-                    ),
-                    Some(
-                        "Replace dynamic dispatch with monomorphic generic parameters."
-                            .to_string(),
-                    ),
-                );
+                self . record ("SMA-SCROOGE-011" , ty . span () , format ! ("Trait object or dynamic dispatch detected in hot-path field `{struct_name}.{field_name}`.") , Some ("Replace dynamic dispatch with monomorphic generic parameters." . to_string () ,) ,) ;
             }
             _ => {}
         }
     }
 }
-
 fn has_attr(attrs: &[Attribute], name: &str) -> bool {
     attrs.iter().any(|a| {
         a.path().is_ident(name) || a.path().segments.last().is_some_and(|s| s.ident == name)
     })
 }
-
 fn has_cfg_test(attrs: &[Attribute]) -> bool {
     attrs.iter().any(|a| {
         if a.path().is_ident("cfg") {
@@ -891,7 +714,6 @@ fn has_cfg_test(attrs: &[Attribute]) -> bool {
         }
     })
 }
-
 fn has_cache_align(attrs: &[Attribute]) -> bool {
     attrs.iter().any(|a| {
         if a.path().is_ident("repr") {
@@ -899,7 +721,7 @@ fn has_cache_align(attrs: &[Attribute]) -> bool {
             let _ = a.parse_nested_meta(|meta| {
                 if meta.path.is_ident("align") {
                     let content;
-                    syn::parenthesized!(content in meta.input);
+                    syn :: parenthesized ! (content in meta . input);
                     if let Ok(lit) = content.parse::<syn::LitInt>()
                         && lit.base10_parse::<u64>().unwrap_or(0) >= 64
                     {
@@ -914,7 +736,6 @@ fn has_cache_align(attrs: &[Attribute]) -> bool {
         }
     })
 }
-
 fn has_repr_transparent(attrs: &[Attribute]) -> bool {
     attrs.iter().any(|a| {
         if a.path().is_ident("repr") {
@@ -931,7 +752,6 @@ fn has_repr_transparent(attrs: &[Attribute]) -> bool {
         }
     })
 }
-
 fn is_impl_of(item_impl: &ItemImpl, trait_name: &str) -> bool {
     if let Some((path, _)) = &item_impl.trait_ {
         path.segments.last().is_some_and(|s| s.ident == trait_name)
@@ -939,7 +759,6 @@ fn is_impl_of(item_impl: &ItemImpl, trait_name: &str) -> bool {
         false
     }
 }
-
 fn is_receiver_mut(sig: &syn::Signature) -> bool {
     matches!(
         sig.receiver(),
@@ -952,179 +771,5 @@ fn is_receiver_mut(sig: &syn::Signature) -> bool {
         })
     )
 }
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_scan_file_syntax_error_emits_parse_diagnostic() {
-        let temp_dir =
-            std::env::temp_dir().join(format!("stitch_test_syntax_err_{}", std::process::id()));
-        std::fs::create_dir_all(&temp_dir).unwrap();
-        let bad_file = temp_dir.join("broken.rs");
-        std::fs::write(&bad_file, "pub struct Bad { invalid syntax here !!!").unwrap();
-
-        let cfg = StitchConfig::default();
-        let runner = CheckRunner::new(&cfg, &temp_dir);
-        let diags = runner.scan_file(&bad_file);
-        let _ = std::fs::remove_dir_all(&temp_dir);
-
-        assert!(
-            !diags.is_empty(),
-            "Corrupted file must produce diagnostics, not empty vec!"
-        );
-        assert!(
-            diags.iter().any(|d| d.code == "SMA-PARSE-001"),
-            "Expected SMA-PARSE-001"
-        );
-    }
-
-    #[test]
-    fn test_scan_file_missing_emits_io_diagnostic() {
-        let non_existent = Path::new("non_existent_never_file_12345.rs");
-        let cfg = StitchConfig::default();
-        let runner = CheckRunner::new(&cfg, Path::new("."));
-        let diags = runner.scan_file(non_existent);
-
-        assert!(!diags.is_empty());
-        assert!(
-            diags.iter().any(|d| d.code == "SMA-IO-001"),
-            "Expected SMA-IO-001"
-        );
-    }
-
-    #[test]
-    fn test_recursive_heap_ban_detects_nested_types() {
-        let code = r#"
-            #[stitch::layer]
-            pub struct NestedHeapLayer {
-                pub opt: Option<String>,
-                pub arr: [String; 4],
-                pub tup: (u8, Vec<u8>),
-                pub dyn_ref: &'static dyn std::fmt::Display,
-            }
-        "#;
-        let syntax_tree = syn::parse_file(code).unwrap();
-        let cfg = StitchConfig::default();
-        let mut visitor = AstScanner {
-            config: &cfg,
-            file_path: Path::new("test_nested.rs"),
-            diagnostics: Vec::new(),
-            in_hot_path_fn: false,
-            in_pipeline_impl: false,
-            in_test: false,
-        };
-        visitor.visit_file(&syntax_tree);
-
-        let scrooge_010: Vec<_> = visitor
-            .diagnostics
-            .iter()
-            .filter(|d| d.code == "SMA-SCROOGE-010")
-            .collect();
-        let scrooge_011: Vec<_> = visitor
-            .diagnostics
-            .iter()
-            .filter(|d| d.code == "SMA-SCROOGE-011")
-            .collect();
-
-        assert_eq!(
-            scrooge_010.len(),
-            3,
-            "Expected Option<String>, [String; 4], (u8, Vec<u8>) to be caught"
-        );
-        assert_eq!(
-            scrooge_011.len(),
-            1,
-            "Expected dyn std::fmt::Display to be caught"
-        );
-    }
-
-    #[test]
-    fn test_hotpath_alloc_and_methods_detected() {
-        let code = r#"
-            pub struct TestLayer;
-            impl TestLayer {
-                pub fn on_enter(&self, ctx: &mut (), intent: ()) {
-                    let _ = Box::new(42);
-                    let _ = "hello".to_string();
-                    println!("alloc logging");
-                    todo!();
-                }
-            }
-        "#;
-        let syntax_tree = syn::parse_file(code).unwrap();
-        let cfg = StitchConfig::default();
-        let mut visitor = AstScanner {
-            config: &cfg,
-            file_path: Path::new("test_hotpath.rs"),
-            diagnostics: Vec::new(),
-            in_hot_path_fn: false,
-            in_pipeline_impl: false,
-            in_test: false,
-        };
-        visitor.visit_file(&syntax_tree);
-
-        assert!(
-            visitor
-                .diagnostics
-                .iter()
-                .any(|d| d.code == "SMA-HOTPATH-020"),
-            "Expected SMA-HOTPATH-020 for println/todo"
-        );
-        assert!(
-            visitor
-                .diagnostics
-                .iter()
-                .any(|d| d.code == "SMA-HOTPATH-021"),
-            "Expected SMA-HOTPATH-021 for to_string"
-        );
-        assert!(
-            visitor
-                .diagnostics
-                .iter()
-                .any(|d| d.code == "SMA-HOTPATH-022"),
-            "Expected SMA-HOTPATH-022 for Box::new"
-        );
-    }
-
-    #[test]
-    fn test_stringly_typed_macro_attribute_detected() {
-        let code = r#"
-            #[stitch(codec = "varint", column = "dict")]
-            pub struct Frame {
-                pub id: u64,
-            }
-
-            #[stitch(codec = Varint, column = ColumnCodec::Dict)]
-            pub struct GoodFrame {
-                pub id: u64,
-            }
-        "#;
-        let syntax_tree = syn::parse_file(code).unwrap();
-        let cfg = StitchConfig::default();
-        let mut visitor = AstScanner {
-            config: &cfg,
-            file_path: Path::new("test_stringly.rs"),
-            diagnostics: Vec::new(),
-            in_hot_path_fn: false,
-            in_pipeline_impl: false,
-            in_test: false,
-        };
-        visitor.visit_file(&syntax_tree);
-
-        let stringly_diags: Vec<_> = visitor
-            .diagnostics
-            .iter()
-            .filter(|d| d.code == "SMA-SCROOGE-016")
-            .collect();
-
-        assert_eq!(
-            stringly_diags.len(),
-            2,
-            "Expected exactly 2 stringly-typed attribute violations in Frame"
-        );
-        assert!(stringly_diags[0].message.contains("\"varint\""));
-        assert!(stringly_diags[1].message.contains("\"dict\""));
-    }
-}
+mod tests;
