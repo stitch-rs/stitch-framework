@@ -143,9 +143,17 @@ pub fn expand_newtype_pipeline(
         }
     };
 
+    let first_lifetime = generics.lifetimes().next().map(|lt| &lt.lifetime);
+
     let intent_ty = match args.intent {
         Some(ty) => ty,
-        None if is_wire => syn::parse_quote!(&[u8]),
+        None if is_wire => {
+            if let Some(lt) = first_lifetime {
+                syn::parse_quote!(&#lt [u8])
+            } else {
+                syn::parse_quote!(&'a [u8])
+            }
+        }
         None => {
             return Err(Error::new(
                 ident.span(),
