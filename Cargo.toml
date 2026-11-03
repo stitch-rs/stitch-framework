@@ -10,12 +10,12 @@ resolver = "2"
 [workspace.package]
 version = "0.3.0"
 edition = "2024"
-rust-version = "1.85.0"
+rust-version = "1.88"
 authors = ["Stitch Contributors", "GoldSrc.rs Systems Architects"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/ulquiorracode/stitch-rs"
-homepage = "https://github.com/ulquiorracode/stitch-rs"
-documentation = "https://docs.rs/stitch-rs"
+repository = "https://github.com/stitch-rs/stitch-framework"
+homepage = "https://github.com/stitch-rs"
+documentation = "https://docs.rs/stitch-core"
 readme = "README.md"
 keywords = ["pipeline", "middleware", "u-cycle", "sma", "zero-cost"]
 categories = ["rust-patterns"]

@@ -1,7 +1,7 @@
 # stitch-rs
 
 <!-- Project Status & Metrics -->
-![Status](https://img.shields.io/badge/status-active%20development-orange?logo=rust) [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license) [![CI](https://github.com/ulquiorracode/stitch-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/ulquiorracode/stitch-rs/actions/workflows/ci.yml) [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?logo=readme)](https://github.com/RichardLitt/standard-readme)  
+![Status](https://img.shields.io/badge/status-active%20development-orange?logo=rust) [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license) [![CI](https://github.com/stitch-rs/stitch-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/stitch-rs/stitch-framework/actions/workflows/ci.yml) [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?logo=readme)](https://github.com/RichardLitt/standard-readme)  
 <!-- Repository & Community -->
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md) [![MSRV: 1.85.0](https://img.shields.io/badge/MSRV-1.85.0-blue.svg?logo=rust)](https://doc.rust-lang.org/edition-guide/rust-2024/) [![Crates.io](https://img.shields.io/crates/v/stitch-rs?style=flat-square)](https://crates.io/crates/stitch-rs) [![Docs.rs](https://img.shields.io/docsrs/stitch-rs?style=flat-square)](./docs/)
 

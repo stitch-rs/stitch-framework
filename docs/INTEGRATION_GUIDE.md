@@ -7,10 +7,12 @@ This guide describes how to integrate `stitch-rs` into high-performance host run
 ## 1. Architectural Philosophy in Game Engines
 
 In realtime game servers (e.g. GoldSrc / ReHLDS tick loop running at 1000 FPS), every microsecond counts. Traditional plugin stacks incur severe performance penalties:
+
 - Dynamic trait objects (`Box<dyn PluginHook>`) trigger indirect branch mispredictions on every engine callback (`server_frame`, `player_spawn`, `cmd_dispatch`).
 - Lack of panic boundaries means a single faulty plugin crashes the entire game server.
 
 `stitch-rs` resolves this via **The Sewing Machine Architecture (SMA)**:
+
 1. **Compile-time Monomorphism**: Pipelines are compiled as unrolled, inlined functions with zero vtable dispatch.
 2. **Panic Barrier**: Boundary hosts wrap untrusted plugin execution via `Pipeline::dispatch_isolated`.
 

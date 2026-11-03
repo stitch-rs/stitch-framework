@@ -14,6 +14,7 @@ readme = "README.md"
 [features]
 default = ["std"]
 std = ["stitch-core/std"]
+machine = []
 
 [dependencies]
 stitch-core = { workspace = true }

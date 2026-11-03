@@ -158,4 +158,3 @@ SMA eliminates conceptual entropy by defining the strict relationship between po
    - Encapsulates panic boundaries (`catch_unwind`), null safety, and memory marshaling.
    - **Resolution of "Bridge"**: The legacy concept of "Bridge" is subsumed into `Adapter`. Any bridge is an adapter to an external provider.
    - **Resolution of "Hub"**: Recognized as a **Composite Adapter** or **Routing Adapter** that aggregates or multiplexes multiple adapters across a shared port.
-

@@ -64,6 +64,12 @@ impl<TEvent: Event, TSink: OutboxEgressSink<TEvent>, const CAP: usize>
             return Ok(0);
         }
 
+        for i in 0..self.staging_len {
+            // SAFETY: Elements 0..staging_len are initialized from prior interrupted pass.
+            unsafe {
+                self.staging_buffer[i].assume_init_drop();
+            }
+        }
         self.staging_len = 0;
         outbox.drain(|event| {
             if self.staging_len < CAP {

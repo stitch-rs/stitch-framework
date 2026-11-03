@@ -2,7 +2,7 @@
   "config": {
     "default": true,
     "MD013": false,
-    "MD024": false,
+    "MD024": { "siblings_only": true },
     "MD025": false,
     "MD033": false,
     "MD041": false
@@ -10,6 +10,7 @@
   "ignores": [
     "target/**",
     "**/target/**",
-    "**/book/book/**"
+    "book/book/**",
+    "*.bk"
   ]
 }
