@@ -4,12 +4,14 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Item, ItemStruct, parse_macro_input};
 
+mod newtype_pipeline;
 mod pipeline;
 mod rules;
 mod scrooge;
 mod taxonomy;
 mod visitor;
 
+use newtype_pipeline::*;
 use pipeline::*;
 use rules::*;
 use scrooge::*;
@@ -237,4 +239,59 @@ pub fn command(_args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn define_pipeline(input: TokenStream) -> TokenStream {
     let def = parse_macro_input!(input as PipelineDef);
     expand_define_pipeline(def).into()
+}
+
+/// Declares a compile-time monomorphic SMA execution pipeline expanding into a `#[repr(transparent)]` Tuple Struct.
+///
+/// # Arguments
+/// - `context`: Type of the root blackboard context.
+/// - `intent`: Type of the intent entering the pipeline.
+/// - `outcome`: Return type of successful traversal (default: `()`).
+/// - `error`: Error type returned on traversal failure (default: `()`).
+/// - `layers`: Ordered array of middleware layers `[LayerA, LayerB, ...]` in natural forward execution order.
+/// - `terminal`: The terminal leaf handler node type.
+/// - `crate`: (Optional) Root path to `stitch_core`.
+///
+/// # Example
+/// ```rust,ignore
+/// #[pipeline(
+///     context = MyContext,
+///     intent = MyIntent,
+///     outcome = u32,
+///     error = MyError,
+///     layers = [AuthLayer, RateLimitLayer],
+///     terminal = ExecTerminal,
+/// )]
+/// pub struct MyPipeline;
+/// ```
+#[proc_macro_attribute]
+pub fn pipeline(args: TokenStream, input: TokenStream) -> TokenStream {
+    let parsed_args = parse_macro_input!(args as PipelineAttrArgs);
+    let item_struct = parse_macro_input!(input as ItemStruct);
+    match expand_newtype_pipeline(parsed_args, item_struct, false) {
+        Ok(tokens) => tokens.into(),
+        Err(e) => e.to_compile_error().into(),
+    }
+}
+
+/// Declares a wire transport framing and resync pipeline expanding into a `#[repr(transparent)]` Tuple Struct.
+///
+/// Defaults `context` to `WireBlackboard`, `intent` to `&[u8]`, `outcome` to `usize`, and `error` to `WireError`.
+///
+/// # Example
+/// ```rust,ignore
+/// #[wire_pipeline(
+///     layers = [SwarResyncLayer, FramingLayer, CastagnoliCrcLayer, MtuChunkingLayer],
+///     terminal = BufferTerminal<'b>,
+/// )]
+/// pub struct GameWirePipeline<'a, 'b>;
+/// ```
+#[proc_macro_attribute]
+pub fn wire_pipeline(args: TokenStream, input: TokenStream) -> TokenStream {
+    let parsed_args = parse_macro_input!(args as PipelineAttrArgs);
+    let item_struct = parse_macro_input!(input as ItemStruct);
+    match expand_newtype_pipeline(parsed_args, item_struct, true) {
+        Ok(tokens) => tokens.into(),
+        Err(e) => e.to_compile_error().into(),
+    }
 }

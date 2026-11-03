@@ -28,8 +28,8 @@ pub mod prelude {
 
     #[cfg(feature = "macros")]
     pub use stitch_macros::{
-        adapter, blackboard, data, define_pipeline, entity, event, id, layer, port, provider,
-        terminal, token, value_object,
+        adapter, blackboard, data, define_pipeline, entity, event, id, layer, pipeline, port,
+        provider, terminal, token, value_object, wire_pipeline,
     };
 }
 
@@ -101,5 +101,59 @@ mod tests {
         let res = pipeline.dispatch(&mut ctx, &5);
         assert!(res.is_ok());
         assert_eq!(ctx.val, 15);
+    }
+
+    struct LayerOne;
+    impl Layer<MockContext, u32, u32, ()> for LayerOne {
+        fn on_enter(&self, ctx: &mut MockContext, intent: u32) -> FlowControl<u32, u32, ()> {
+            ctx.val += 100;
+            FlowControl::Proceed(intent + 1)
+        }
+        fn on_exit(&self, ctx: &mut MockContext, outcome: &mut Result<u32, ()>) {
+            ctx.val += 1;
+            if let Ok(v) = outcome {
+                *v += 10;
+            }
+        }
+    }
+
+    struct LayerTwo;
+    impl Layer<MockContext, u32, u32, ()> for LayerTwo {
+        fn on_enter(&self, ctx: &mut MockContext, intent: u32) -> FlowControl<u32, u32, ()> {
+            ctx.val += 200;
+            FlowControl::Proceed(intent * 2)
+        }
+        fn on_exit(&self, ctx: &mut MockContext, _outcome: &mut Result<u32, ()>) {
+            ctx.val += 2;
+        }
+    }
+
+    struct SimpleTerminal;
+    impl Terminal<MockContext, u32, u32, ()> for SimpleTerminal {
+        fn execute(&mut self, ctx: &mut MockContext, intent: u32) -> Result<u32, ()> {
+            ctx.val += 1000;
+            Ok(intent + 5)
+        }
+    }
+
+    #[pipeline(
+        context = MockContext,
+        intent = u32,
+        outcome = u32,
+        error = (),
+        layers = [LayerOne, LayerTwo],
+        terminal = SimpleTerminal,
+        crate = crate,
+    )]
+    struct TestNewtypePipeline;
+
+    #[test]
+    fn test_attribute_newtype_pipeline_execution() {
+        let mut ctx = MockContext { val: 0 };
+        let mut pipe = TestNewtypePipeline::new(LayerOne, LayerTwo, SimpleTerminal);
+
+        let res = pipe.run_cycle(&mut ctx, 10);
+        assert_eq!(res, Ok(37));
+        assert_eq!(ctx.val, 1303);
     }
 }
