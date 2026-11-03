@@ -238,14 +238,14 @@ pub fn run_check(target_dir: &Path, args: CheckArgs<'_>) -> Result<(), Box<dyn s
     }
 
     let config = StitchConfig::load(target_dir)?;
-    if let Some(s) = &scope_filter {
-        if crate::config::collect_rust_files(target_dir, Some(s)).count() == 0 {
-            eprintln!(
-                "⚠️  Warning: Scope filter `{}` matched 0 files in `{}`.",
-                s.raw,
-                target_dir.display()
-            );
-        }
+    if let Some(s) = &scope_filter
+        && crate::config::collect_rust_files(target_dir, Some(s)).count() == 0
+    {
+        eprintln!(
+            "⚠️  Warning: Scope filter `{}` matched 0 files in `{}`.",
+            s.raw,
+            target_dir.display()
+        );
     }
     let runner = CheckRunner::new_scoped(&config, target_dir, scope_filter);
     let mut diagnostics = runner.run();
@@ -343,14 +343,14 @@ pub fn run_health(
     );
     let scope_filter = scope.map(ScopeFilter::new);
     let config = StitchConfig::load(target_dir)?;
-    if let Some(s) = &scope_filter {
-        if crate::config::collect_rust_files(target_dir, Some(s)).count() == 0 {
-            eprintln!(
-                "⚠️  Warning: Scope filter `{}` matched 0 files in `{}`.",
-                s.raw,
-                target_dir.display()
-            );
-        }
+    if let Some(s) = &scope_filter
+        && crate::config::collect_rust_files(target_dir, Some(s)).count() == 0
+    {
+        eprintln!(
+            "⚠️  Warning: Scope filter `{}` matched 0 files in `{}`.",
+            s.raw,
+            target_dir.display()
+        );
     }
     let engine = HealthEngine::new_scoped(&config, target_dir, scope_filter);
     let report = engine.evaluate();

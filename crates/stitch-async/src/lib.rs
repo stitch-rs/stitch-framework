@@ -16,14 +16,10 @@
 extern crate std;
 
 pub mod egress;
-#[cfg(feature = "machine")]
-pub mod machine_adapter;
 pub mod middleware;
 pub mod pipeline;
 
 pub use egress::{OutboxEgressSink, OutboxEgressWorker};
-#[cfg(feature = "machine")]
-pub use machine_adapter::{MachineTerminal, PipelineStepMachine};
 pub use middleware::{AsyncLayer, AsyncTerminal};
 pub use pipeline::{AsyncPipeline, AsyncPipelineChain, AsyncStackNode, AsyncTerminalNode};
 

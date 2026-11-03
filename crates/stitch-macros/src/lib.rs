@@ -91,6 +91,7 @@ pub fn adapter(_args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn provider(_args: TokenStream, input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as Item);
     if let Item::Struct(s) = &item {
+        #[allow(clippy::collapsible_if)]
         if let Err(e) = verify_suffix(&s.ident, "Provider", SMA_TAXO_005) {
             return e.to_compile_error().into();
         }
