@@ -216,7 +216,7 @@ impl<'a> TopologyScanner<'a> {
                 let child_rel = rel_path.join(&name);
                 let manifest = path.join("Cargo.toml");
 
-                if manifest.is_file() && depth > 0 {
+                if manifest.is_file() {
                     let (pkg_name, _) = self.parse_package_name(&manifest);
                     let parent_cat = rel_path
                         .components()
@@ -458,6 +458,96 @@ mod tests {
 
         assert_eq!(report.detected_kind, TopologyKind::Malformed);
         assert!(report.diagnostics.iter().any(|d| d.code == "SMA-TOPO-001"));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_asymmetric_depth_violation_caught() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("stitch_topo_asym_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let shallow = temp_dir.join("engine"); // Depth 1
+        let deep = temp_dir.join("backends/standalone"); // Depth 2
+        std::fs::create_dir_all(&shallow).unwrap();
+        std::fs::create_dir_all(&deep).unwrap();
+
+        std::fs::write(
+            temp_dir.join("Cargo.toml"),
+            r#"
+            [workspace]
+            members = ["engine", "backends/*"]
+        "#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            shallow.join("Cargo.toml"),
+            r#"
+            [package]
+            name = "engine"
+            version = "0.1.0"
+        "#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            deep.join("Cargo.toml"),
+            r#"
+            [package]
+            name = "standalone"
+            version = "0.1.0"
+        "#,
+        )
+        .unwrap();
+
+        let cfg = StitchConfig::default();
+        let scanner = TopologyScanner::new(&cfg, &temp_dir);
+        let report = scanner.evaluate();
+
+        assert_eq!(report.detected_kind, TopologyKind::Malformed);
+        assert!(
+            report.diagnostics.iter().any(|d| d.code == "SMA-TOPO-002"),
+            "Expected SMA-TOPO-002 Asymmetric Depth violation"
+        );
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_taxonomy_mismatch_warning_caught() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("stitch_topo_taxo_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        let pkg_dir = temp_dir.join("crates/audio_engine");
+        std::fs::create_dir_all(&pkg_dir).unwrap();
+
+        std::fs::write(
+            temp_dir.join("Cargo.toml"),
+            r#"
+            [workspace]
+            members = ["crates/*"]
+        "#,
+        )
+        .unwrap();
+
+        // Cargo package name has zero relation to folder name "audio_engine"
+        std::fs::write(
+            pkg_dir.join("Cargo.toml"),
+            r#"
+            [package]
+            name = "totally_unrelated_renderer"
+            version = "0.1.0"
+        "#,
+        )
+        .unwrap();
+
+        let cfg = StitchConfig::default();
+        let scanner = TopologyScanner::new(&cfg, &temp_dir);
+        let report = scanner.evaluate();
+
+        assert!(
+            report.diagnostics.iter().any(|d| d.code == "SMA-TOPO-003"),
+            "Expected SMA-TOPO-003 Taxonomy Mismatch warning"
+        );
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
