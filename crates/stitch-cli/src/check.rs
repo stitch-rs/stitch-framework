@@ -183,6 +183,11 @@ impl<'a> CheckRunner<'a> {
         // Cross-file boundary checks
         diagnostics.extend(self.check_boundaries());
 
+        // Structural Workspace Topology checks
+        let topo_scanner = crate::topology::TopologyScanner::new(self.config, self.root_dir);
+        let topo_report = topo_scanner.evaluate();
+        diagnostics.extend(topo_report.diagnostics);
+
         diagnostics
     }
 

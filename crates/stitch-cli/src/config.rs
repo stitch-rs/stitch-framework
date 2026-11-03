@@ -252,6 +252,13 @@ impl Default for StitchConfig {
         rules.insert("SMA-PARSE-001".to_string(), RuleSeverity::Deny);
         rules.insert("SMA-PARSE-002".to_string(), RuleSeverity::Deny);
 
+        rules.insert("TOPO-HYBRID-ROOT".to_string(), RuleSeverity::Deny);
+        rules.insert("TOPO-ASYMMETRIC-DEPTH".to_string(), RuleSeverity::Deny);
+        rules.insert("TOPO-TAXONOMY-MISMATCH".to_string(), RuleSeverity::Warn);
+        rules.insert("SMA-TOPO-001".to_string(), RuleSeverity::Deny);
+        rules.insert("SMA-TOPO-002".to_string(), RuleSeverity::Deny);
+        rules.insert("SMA-TOPO-003".to_string(), RuleSeverity::Warn);
+
         Self {
             workspace: WorkspaceConfig::default(),
             rules,
@@ -436,6 +443,9 @@ pub fn canonical_rule_key(key: &str) -> &'static str {
         "SMA-IO-002" | "IO-MANIFEST-ERROR" => "SMA-IO-002",
         "SMA-PARSE-001" | "PARSE-SYNTAX-ERROR" => "SMA-PARSE-001",
         "SMA-PARSE-002" | "PARSE-MANIFEST-ERROR" => "SMA-PARSE-002",
+        "SMA-TOPO-001" | "TOPO-HYBRID-ROOT" => "SMA-TOPO-001",
+        "SMA-TOPO-002" | "TOPO-ASYMMETRIC-DEPTH" => "SMA-TOPO-002",
+        "SMA-TOPO-003" | "TOPO-TAXONOMY-MISMATCH" => "SMA-TOPO-003",
         _ => "SMA-UNKNOWN",
     }
 }

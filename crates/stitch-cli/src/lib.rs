@@ -6,6 +6,7 @@ pub mod fix;
 pub mod graph;
 pub mod health;
 pub mod metrics;
+pub mod topology;
 
 use check::CheckRunner;
 use clap::{Parser, Subcommand};
@@ -49,6 +50,9 @@ pub enum Commands {
         /// Target taxonomy naming and suffix conventions
         #[arg(long)]
         taxo: bool,
+        /// Target repository structural topology (Facade, Uniform, Segmented)
+        #[arg(long)]
+        topo: bool,
         /// Target boundary isolation and dependency inversion
         #[arg(long)]
         bound: bool,
@@ -153,6 +157,7 @@ pub fn execute(command: Commands) -> Result<(), Box<dyn std::error::Error>> {
             category,
             scrooge,
             taxo,
+            topo,
             bound,
             hotpath,
             concur,
@@ -167,6 +172,7 @@ pub fn execute(command: Commands) -> Result<(), Box<dyn std::error::Error>> {
                 category: category.as_deref(),
                 scrooge,
                 taxo,
+                topo,
                 bound,
                 hotpath,
                 concur,
@@ -219,6 +225,7 @@ pub struct CheckArgs<'a> {
     pub format: &'a str,
     pub scrooge: bool,
     pub taxo: bool,
+    pub topo: bool,
     pub bound: bool,
     pub hotpath: bool,
     pub concur: bool,
@@ -264,6 +271,9 @@ pub fn run_check(target_dir: &Path, args: CheckArgs<'_>) -> Result<(), Box<dyn s
     }
     if args.taxo {
         cat_set.insert("taxo".to_string());
+    }
+    if args.topo {
+        cat_set.insert("topo".to_string());
     }
     if args.bound {
         cat_set.insert("bound".to_string());
