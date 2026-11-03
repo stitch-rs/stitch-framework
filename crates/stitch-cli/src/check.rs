@@ -716,7 +716,15 @@ impl<'a> AstScanner<'a> {
                             let unquoted = s.trim_matches('"');
                             if matches!(
                                 unquoted,
-                                "varint" | "zigzag" | "raw" | "dict" | "rle" | "gorilla" | "adaptive" | "direct" | "balanced"
+                                "varint"
+                                    | "zigzag"
+                                    | "raw"
+                                    | "dict"
+                                    | "rle"
+                                    | "gorilla"
+                                    | "adaptive"
+                                    | "direct"
+                                    | "balanced"
                             ) {
                                 self.record(
                                     "SMA-SCROOGE-016",

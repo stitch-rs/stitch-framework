@@ -427,7 +427,9 @@ pub fn run_fix(target_dir: &Path, args: FixArgs<'_>) -> Result<(), Box<dyn std::
     let run_taxo = args.all || cat_set.contains("taxo");
 
     if run_scrooge {
-        println!("    Active category: `scrooge` (struct alignment optimization & stringly-typed macro remediation)");
+        println!(
+            "    Active category: `scrooge` (struct alignment optimization & stringly-typed macro remediation)"
+        );
         let engine = FixEngine::new_scoped(target_dir, scope_filter.clone());
         let report = engine.run_scrooge(args.dry_run)?;
         let stringly_fixed = engine.run_stringly_typed(args.dry_run)?;
@@ -443,8 +445,7 @@ pub fn run_fix(target_dir: &Path, args: FixArgs<'_>) -> Result<(), Box<dyn std::
             println!("{:=<80}", "");
             println!(
                 "  Status: {} struct fixes, {} stringly-typed macro fixes",
-                action,
-                stringly_fixed
+                action, stringly_fixed
             );
             println!(
                 "  Total Struct Padding Eliminated: {} bytes\n",
