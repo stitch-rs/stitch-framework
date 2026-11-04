@@ -276,6 +276,46 @@ mod tests {
 
     #[test]
     #[cfg(feature = "std")]
+    fn test_nested_pipeline_unwind_aborts_traversal_contract_m7() {
+        struct OuterAuditLayer;
+        impl Layer<TestBlackboard, MathIntent, u64, &'static str> for OuterAuditLayer {
+            fn on_enter(
+                &self,
+                ctx: &mut TestBlackboard,
+                intent: MathIntent,
+            ) -> FlowControl<MathIntent, u64, &'static str> {
+                ctx.audit[0] = "outer_entered";
+                ctx.audit_len = 1;
+                FlowControl::Proceed(intent)
+            }
+            fn on_exit(&self, ctx: &mut TestBlackboard, _outcome: &mut Result<u64, &'static str>) {
+                ctx.audit[1] = "outer_exited";
+            }
+        }
+
+        let mut ctx = TestBlackboard {
+            state: 0,
+            audit_len: 0,
+            audit: [""; 4],
+        };
+
+        // Outer layer wraps PanickingLayer. Under Contract M7, Rust unwinding skips
+        // outer layer's on_exit without scope guards by design, while dispatch_isolated catches it.
+        let mut pipeline = Pipeline::on_terminal(MathTerminal)
+            .wrap(PanickingLayer)
+            .wrap(OuterAuditLayer);
+
+        let res = pipeline.dispatch_isolated(&mut ctx, MathIntent::Add(100));
+        assert!(res.is_err(), "Must catch panic from nested layer");
+        assert_eq!(ctx.audit[0], "outer_entered", "Outer layer entered");
+        assert_ne!(
+            ctx.audit[1], "outer_exited",
+            "Contract Invariant M7: on_exit is bypassed during stack unwinding"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
     fn test_poisoned_context_state_after_panic_and_safe_reinit() {
         struct PoisoningLayer;
         impl Layer<TestBlackboard, MathIntent, u64, &'static str> for PoisoningLayer {
