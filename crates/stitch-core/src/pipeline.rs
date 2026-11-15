@@ -21,7 +21,7 @@ pub struct TerminalNode<T>(T);
 impl<T> TerminalNode<T> {
     /// Wraps a terminal handler in a terminal chain leaf node.
     #[inline(always)]
-    pub(crate) const fn new(terminal: T) -> Self {
+    pub const fn new(terminal: T) -> Self {
         Self(terminal)
     }
 
@@ -47,7 +47,7 @@ pub struct StackNode<M, Inner> {
 impl<M, Inner> StackNode<M, Inner> {
     /// Constructs a new stack node wrapping an inner chain with an outer layer.
     #[inline(always)]
-    pub(crate) const fn new(layer: M, inner: Inner) -> Self {
+    pub const fn new(layer: M, inner: Inner) -> Self {
         Self { layer, inner }
     }
 
@@ -87,6 +87,14 @@ where
 impl<TCtx: Blackboard, TIntent, TOutcome, TErr, TChain>
     Pipeline<TCtx, TIntent, TOutcome, TErr, TChain>
 {
+    /// Constructs a pipeline directly from a pre-composed chain node.
+    pub const fn from_chain(chain: TChain) -> Self {
+        Self {
+            chain,
+            _phantom: PhantomData,
+        }
+    }
+
     /// Wraps the current pipeline with an additional outer middleware layer.
     pub fn wrap<M>(self, layer: M) -> Pipeline<TCtx, TIntent, TOutcome, TErr, StackNode<M, TChain>>
     where
