@@ -17,5 +17,7 @@ help: the trait `Port` is implemented for `()`
 note: required by a bound in `stitch_core::Adapter::TargetPort`
  --> $WORKSPACE/crates/stitch-core/src/taxonomy.rs
   |
+  | pub trait Adapter<P: Port + ?Sized = ()>: Send + Sync {
+  |     /// The target port contract implemented or bridged by this adapter.
   |     type TargetPort: Port + ?Sized;
   |                      ^^^^ required by this bound in `Adapter::TargetPort`

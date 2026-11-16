@@ -64,10 +64,10 @@ impl<TEvent: Event, TSink: OutboxEgressSink<TEvent>, const CAP: usize>
             return Ok(0);
         }
 
-        for i in 0..self.staging_len {
+        for slot in &mut self.staging_buffer[..self.staging_len] {
             // SAFETY: Elements 0..staging_len are initialized from prior interrupted pass.
             unsafe {
-                self.staging_buffer[i].assume_init_drop();
+                slot.assume_init_drop();
             }
         }
         self.staging_len = 0;
@@ -94,10 +94,10 @@ impl<TEvent: Event, TSink: OutboxEgressSink<TEvent>, const CAP: usize>
         let send_res = self.sink.send_batch(slice).await;
 
         // Cleanup: drop all initialized elements to prevent resource leak
-        for i in 0..count {
+        for slot in &mut self.staging_buffer[..count] {
             // SAFETY: Elements 0..count were initialized.
             unsafe {
-                self.staging_buffer[i].assume_init_drop();
+                slot.assume_init_drop();
             }
         }
         self.staging_len = 0;
@@ -112,10 +112,10 @@ impl<TEvent: Event, TSink: OutboxEgressSink<TEvent>, const CAP: usize> Drop
     for OutboxEgressWorker<TEvent, TSink, CAP>
 {
     fn drop(&mut self) {
-        for i in 0..self.staging_len {
+        for slot in &mut self.staging_buffer[..self.staging_len] {
             // SAFETY: Elements 0..staging_len are valid initialized instances.
             unsafe {
-                self.staging_buffer[i].assume_init_drop();
+                slot.assume_init_drop();
             }
         }
     }
