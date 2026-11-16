@@ -77,7 +77,8 @@ Outcome ◄─────── [Layer A: on_exit]  ◄── [Layer B: on_exit
 | **`Adapter`** | Bidirectional translation bridge to a Provider | Encapsulates FFI, panic guards, null checks, and composite multiplexing |
 | **`Provider`** | External source, database, OS runtime, or state engine | Owned external resource adapted to a Port |
 
-For detailed memory layouts, failure semantics, and contract invariants, see [ARCHITECTURE.md](ARCHITECTURE.md).
+For detailed memory layouts, failure semantics, and contract invariants, see [ARCHITECTURE.md](ARCHITECTURE.md).  
+For the end-to-end data processing lifecycle and responsibility matrix across `stitch-framework`, `stitch-data`, `stitch-wire`, and `stitch-channel`, see [docs/DATA_PIPELINE.md](docs/DATA_PIPELINE.md).
 
 ---
 
